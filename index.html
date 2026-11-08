@@ -19,14 +19,13 @@
     overflow-x: hidden;
   }
 
-  /* Poem is centered vertically and starts paused */
   .scroll-wrap {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 40px 20px;
+    justify-content: flex-start;
+    padding: 60px 20px 120px;
     transition: opacity 4s ease;
   }
 
@@ -37,7 +36,6 @@
     letter-spacing: 0.4px;
     text-shadow: 0 0 20px rgba(240, 230, 210, 0.15);
     animation: breathe 16s ease-in-out infinite alternate;
-    padding-top: 0;
   }
 
   .poem.paused .fade-line,
@@ -179,7 +177,6 @@
 </head>
 <body>
 
-  <!-- 🎵 Song file — trimmed version, starts at 0 -->
   <audio id="bg-music" loop preload="auto">
     <source src="Ariana Grande - we can't be friends (wait for your love) (official music video).mp3" type="audio/mpeg">
   </audio>
@@ -268,35 +265,82 @@
     const poem = document.getElementById('poem');
     const endingMessage = document.getElementById('endingMessage');
 
-    // ⏱️ EDIT: how long to hold at the very end before fading out (ms)
+    // ⏱️ Auto-scroll speed — pixels per second (lower = slower)
+    const SCROLL_SPEED = 22;
+
+    // ⏱️ How long to hold at the very end before fading out (ms)
     const END_HOLD_MS = 8000;
 
     // ⏱️ Length of the final fade-out (ms)
     const END_FADE_MS = 5000;
 
-    // ⏱️ When the signature finishes appearing
-    // (matches CSS: 60s animation-delay + 5s fade duration)
-    const SIGNATURE_DONE_MS = 65000;
-
+    let autoScrollRAF = null;
+    let lastTimestamp = null;
+    let scrolled = 0;
+    let maxScroll = 0;
     let finished = false;
     let started = false;
     let endingTimer = null;
 
-    // --- ALWAYS START FROM ZERO ON PAGE LOAD ---
+    // --- ALWAYS START FROM ZERO ---
     function resetSong() {
       music.pause();
       try { music.currentTime = 0; } catch (e) {}
     }
     resetSong();
 
+    // --- AUTO SCROLL ---
+    function calcMaxScroll() {
+      maxScroll = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight
+      );
+    }
+
+    function autoScrollStep(timestamp) {
+      if (finished) return;
+
+      if (lastTimestamp === null) lastTimestamp = timestamp;
+      const delta = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      scrolled += SCROLL_SPEED * delta;
+
+      if (scrolled >= maxScroll) {
+        scrolled = maxScroll;
+        window.scrollTo(0, scrolled);
+        return; // hold at bottom; ending is handled by timer, not scroll
+      }
+
+      window.scrollTo(0, scrolled);
+      autoScrollRAF = requestAnimationFrame(autoScrollStep);
+    }
+
+    function startAutoScroll() {
+      if (autoScrollRAF || finished) return;
+      calcMaxScroll();
+      scrolled = window.scrollY;
+      lastTimestamp = null;
+      autoScrollRAF = requestAnimationFrame(autoScrollStep);
+    }
+
+    window.addEventListener('resize', calcMaxScroll);
+
     // --- SCHEDULE THE ENDING (only once, only after start) ---
     function scheduleEnding() {
       if (endingTimer) return;
+
+      // Wait for the poem to finish unfolding AND the scroll to reach
+      // the bottom (whichever takes longer), then hold, then end.
+      const POEM_DONE_MS = 65000; // signature fully visible
+      const SCROLL_DONE_MS = (maxScroll / SCROLL_SPEED) * 1000;
+      const waitMs = Math.max(POEM_DONE_MS, SCROLL_DONE_MS) + END_HOLD_MS;
+
       endingTimer = setTimeout(() => {
         if (finished) return;
         finished = true;
         fadeOutEnding();
-      }, SIGNATURE_DONE_MS + END_HOLD_MS);
+      }, waitMs);
     }
 
     // --- START EVERYTHING TOGETHER ---
@@ -313,7 +357,8 @@
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            // Timer starts HERE — the moment playback truly begins
+            calcMaxScroll();
+            startAutoScroll();
             scheduleEnding();
           })
           .catch(() => {
@@ -322,6 +367,8 @@
             started = false;
           });
       } else {
+        calcMaxScroll();
+        startAutoScroll();
         scheduleEnding();
       }
     }
@@ -361,6 +408,7 @@
 
     // --- INITIAL LOAD: try autoplay ---
     window.addEventListener('load', () => {
+      setTimeout(calcMaxScroll, 500);
       resetSong();
 
       const playPromise = music.play();
@@ -370,6 +418,8 @@
             started = true;
             playBtn.classList.add('hidden');
             poem.classList.remove('paused');
+            calcMaxScroll();
+            startAutoScroll();
             scheduleEnding();
           })
           .catch(() => {
