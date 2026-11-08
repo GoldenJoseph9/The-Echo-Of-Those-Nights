@@ -273,7 +273,7 @@
 
     function scheduleEnding() {
       if (endingTimer) return;
-      const POEM_DONE_MS = 72000;
+      const POEM_DONE_MS = 67000;
       const SCROLL_DONE_MS = (maxScroll / SCROLL_SPEED) * 1000;
       const waitMs = Math.max(POEM_DONE_MS, SCROLL_DONE_MS) + END_HOLD_MS;
       endingTimer = setTimeout(() => {
