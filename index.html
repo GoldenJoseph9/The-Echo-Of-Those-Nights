@@ -25,7 +25,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;   /* ← centers it on screen */
+    justify-content: center;
     padding: 40px 20px;
     transition: opacity 4s ease;
   }
@@ -274,16 +274,30 @@
     // ⏱️ Length of the final fade-out (ms)
     const END_FADE_MS = 5000;
 
+    // ⏱️ When the signature finishes appearing
+    // (matches CSS: 60s animation-delay + 5s fade duration)
+    const SIGNATURE_DONE_MS = 65000;
+
     let finished = false;
     let started = false;
+    let endingTimer = null;
 
-    // --- ALWAYS START FROM ZERO ---
-    // This prevents the "resume where it stopped" behaviour on reload.
+    // --- ALWAYS START FROM ZERO ON PAGE LOAD ---
     function resetSong() {
       music.pause();
       try { music.currentTime = 0; } catch (e) {}
     }
     resetSong();
+
+    // --- SCHEDULE THE ENDING (only once, only after start) ---
+    function scheduleEnding() {
+      if (endingTimer) return;
+      endingTimer = setTimeout(() => {
+        if (finished) return;
+        finished = true;
+        fadeOutEnding();
+      }, SIGNATURE_DONE_MS + END_HOLD_MS);
+    }
 
     // --- START EVERYTHING TOGETHER ---
     function startEverything() {
@@ -293,17 +307,22 @@
       playBtn.classList.add('hidden');
       poem.classList.remove('paused');
 
-      // Force the song back to 0 before playing (handles reloads)
       try { music.currentTime = 0; } catch (e) {}
 
       const playPromise = music.play();
       if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          // If playback fails, reset the state so she can tap again
-          playBtn.classList.remove('hidden');
-          poem.classList.add('paused');
-          started = false;
-        });
+        playPromise
+          .then(() => {
+            // Timer starts HERE — the moment playback truly begins
+            scheduleEnding();
+          })
+          .catch(() => {
+            playBtn.classList.remove('hidden');
+            poem.classList.add('paused');
+            started = false;
+          });
+      } else {
+        scheduleEnding();
       }
     }
 
@@ -340,20 +359,9 @@
       }, 2500 + 22000);
     }
 
-    // --- WHEN SCROLL FINISHES (poem fully shown) ---
-    // We now wait for the signature to appear, then hold, then end.
-    function scheduleEnding() {
-      if (finished) return;
-      finished = true;
-      setTimeout(fadeOutEnding, END_HOLD_MS);
-    }
-
-    // --- INITIAL LOAD ---
+    // --- INITIAL LOAD: try autoplay ---
     window.addEventListener('load', () => {
       resetSong();
-
-      // Try autoplay — if it works, start poem + music together
-      try { music.currentTime = 0; } catch (e) {}
 
       const playPromise = music.play();
       if (playPromise !== undefined) {
@@ -362,9 +370,9 @@
             started = true;
             playBtn.classList.add('hidden');
             poem.classList.remove('paused');
+            scheduleEnding();
           })
           .catch(() => {
-            // Autoplay blocked — keep poem paused, show button
             resetSong();
             playBtn.classList.remove('hidden');
             poem.classList.add('paused');
@@ -372,19 +380,7 @@
       }
     });
 
-    // --- LAST LINE TIMING FIX ---
-    // The signature animation fires at 60s. We wait until 60s + a
-    // short buffer so it's fully visible before ending.
-    const SIGNATURE_DELAY_MS = 60000;
-    const SIGNATURE_FADE_MS = 5000;
-
-    // Trigger the ending sequence after the signature has fully appeared,
-    // regardless of scroll position.
-    setTimeout(() => {
-      if (started) scheduleEnding();
-    }, SIGNATURE_DELAY_MS + SIGNATURE_FADE_MS + 3000);
-
-    // Extra fallback: first tap anywhere starts everything
+    // Extra fallback: first tap anywhere also starts everything
     document.body.addEventListener('click', () => {
       if (!started && !finished) {
         startEverything();
