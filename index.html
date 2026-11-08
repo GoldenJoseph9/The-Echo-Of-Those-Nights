@@ -9,6 +9,12 @@
 
   html, body { height: 100%; }
 
+  /* Force the page to always start from the top on reload */
+  html {
+    overflow-anchor: none;
+    scroll-behavior: auto;
+  }
+
   body {
     background: linear-gradient(160deg, #0f0c29, #302b63, #24243e);
     font-family: 'Georgia', serif;
@@ -58,7 +64,6 @@
     animation: fadeIn 4.5s ease forwards;
   }
 
-  /* h1 is child 1, so first <p> is child 2 ... signature is child 12 */
   .fade-line:nth-child(2)  { animation-delay: 2s; }
   .fade-line:nth-child(3)  { animation-delay: 7.5s; }
   .fade-line:nth-child(4)  { animation-delay: 13s; }
@@ -69,7 +74,7 @@
   .fade-line:nth-child(9)  { animation-delay: 40.5s; }
   .fade-line:nth-child(10) { animation-delay: 46s; }
   .fade-line:nth-child(11) { animation-delay: 51.5s; }
-  .fade-line:nth-child(12) { animation-delay: 57s; }   /* last poem line */
+  .fade-line:nth-child(12) { animation-delay: 57s; }
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(16px); filter: blur(4px); }
@@ -81,7 +86,6 @@
     to   { filter: brightness(1.08); }
   }
 
-  /* signature is child 13 — give it its OWN late delay */
   .signature {
     margin-top: 60px;
     font-style: italic;
@@ -206,6 +210,12 @@
   </div>
 
   <script>
+    // --- Kill scroll restoration BEFORE anything else runs ---
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    window.scrollTo(0, 0);
+
     const music = document.getElementById('bg-music');
     const playBtn = document.getElementById('play-btn');
     const scrollWrap = document.getElementById('scrollWrap');
@@ -252,7 +262,9 @@
     function startAutoScroll() {
       if (autoScrollRAF || finished) return;
       calcMaxScroll();
-      scrolled = window.scrollY;
+      // Always start from the very top, regardless of restored position
+      scrolled = 0;
+      window.scrollTo(0, 0);
       lastTimestamp = null;
       autoScrollRAF = requestAnimationFrame(autoScrollStep);
     }
@@ -261,7 +273,7 @@
 
     function scheduleEnding() {
       if (endingTimer) return;
-      const POEM_DONE_MS = 72000; // signature (64s + 5s fade) + a little slack
+      const POEM_DONE_MS = 72000;
       const SCROLL_DONE_MS = (maxScroll / SCROLL_SPEED) * 1000;
       const waitMs = Math.max(POEM_DONE_MS, SCROLL_DONE_MS) + END_HOLD_MS;
       endingTimer = setTimeout(() => {
@@ -293,8 +305,6 @@
       const p = music.play();
       if (p && p.catch) {
         p.catch(() => {
-          // Autoplay / decode refused — the poem still runs. Show button again
-          // in case the user wants to retry the audio.
           if (!finished) playBtn.classList.remove('hidden');
         });
       }
@@ -328,6 +338,8 @@
     }
 
     window.addEventListener('load', () => {
+      // Force top again after layout is done
+      window.scrollTo(0, 0);
       setTimeout(calcMaxScroll, 500);
       playBtn.classList.remove('hidden');
       poem.classList.add('paused');
