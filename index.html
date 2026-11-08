@@ -27,6 +27,7 @@
     justify-content: flex-start;
     padding: 60px 20px 120px;
     transition: opacity 4s ease;
+    opacity: 1;
   }
 
   .poem {
@@ -265,13 +266,8 @@
     const poem = document.getElementById('poem');
     const endingMessage = document.getElementById('endingMessage');
 
-    // ⏱️ Auto-scroll speed — pixels per second (lower = slower)
     const SCROLL_SPEED = 22;
-
-    // ⏱️ How long to hold at the very end before fading out (ms)
     const END_HOLD_MS = 8000;
-
-    // ⏱️ Length of the final fade-out (ms)
     const END_FADE_MS = 5000;
 
     let autoScrollRAF = null;
@@ -282,12 +278,59 @@
     let started = false;
     let endingTimer = null;
 
-    // --- ALWAYS START FROM ZERO ---
-    function resetSong() {
+    // --- FULL HARD RESET (called on every page load) ---
+    function hardReset() {
+      // 1. Stop the song and reset it
       music.pause();
       try { music.currentTime = 0; } catch (e) {}
+      music.volume = 1;
+
+      // 2. Kill any running timers / animation frames
+      if (endingTimer) { clearTimeout(endingTimer); endingTimer = null; }
+      if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; }
+
+      // 3. Reset all state
+      finished = false;
+      started = false;
+      scrolled = 0;
+      lastTimestamp = null;
+      maxScroll = 0;
+
+      // 4. Scroll to the top
+      window.scrollTo(0, 0);
+
+      // 5. Reset the poem: hide it, force animations to restart cleanly
+      poem.classList.add('paused');
+      const animatedEls = poem.querySelectorAll('.fade-line, .signature');
+      animatedEls.forEach(el => {
+        el.style.animation = 'none';
+        void el.offsetWidth; // force reflow so animation can restart
+        el.style.animation = '';
+      });
+
+      // 6. Make sure the ending message is hidden
+      endingMessage.classList.remove('show');
+
+      // 7. Reset the poem wrapper opacity (in case ending faded it)
+      scrollWrap.style.opacity = '1';
+
+      // 8. Show the button (autoplay may hide it)
+      playBtn.classList.remove('hidden');
     }
-    resetSong();
+
+    // Run hard reset immediately on script load
+    hardReset();
+
+    // Some browsers restore scroll AFTER load — undo that too
+    window.addEventListener('pageshow', (e) => {
+      // fires on normal load AND on back/forward cache restore
+      hardReset();
+    });
+
+    // Also handle the case where the browser tries to restore scroll position
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
 
     // --- AUTO SCROLL ---
     function calcMaxScroll() {
@@ -309,7 +352,7 @@
       if (scrolled >= maxScroll) {
         scrolled = maxScroll;
         window.scrollTo(0, scrolled);
-        return; // hold at bottom; ending is handled by timer, not scroll
+        return;
       }
 
       window.scrollTo(0, scrolled);
@@ -326,14 +369,12 @@
 
     window.addEventListener('resize', calcMaxScroll);
 
-    // --- SCHEDULE THE ENDING (only once, only after start) ---
+    // --- SCHEDULE ENDING ---
     function scheduleEnding() {
       if (endingTimer) return;
 
-      // Wait for the poem to finish unfolding AND the scroll to reach
-      // the bottom (whichever takes longer), then hold, then end.
-      const POEM_DONE_MS = 65000; // signature fully visible
-      const SCROLL_DONE_MS = (maxScroll / SCROLL_SPEED) * 1000;
+      const POEM_DONE_MS = 65000;
+      const SCROLL_DONE_MS = maxScroll > 0 ? (maxScroll / SCROLL_SPEED) * 1000 : 0;
       const waitMs = Math.max(POEM_DONE_MS, SCROLL_DONE_MS) + END_HOLD_MS;
 
       endingTimer = setTimeout(() => {
@@ -343,7 +384,7 @@
       }, waitMs);
     }
 
-    // --- START EVERYTHING TOGETHER ---
+    // --- START EVERYTHING ---
     function startEverything() {
       if (started || finished) return;
       started = true;
@@ -373,7 +414,7 @@
       }
     }
 
-    // --- ENDING SEQUENCE ---
+    // --- ENDING ---
     function fadeOutEnding() {
       scrollWrap.style.opacity = '0';
 
@@ -406,10 +447,9 @@
       }, 2500 + 22000);
     }
 
-    // --- INITIAL LOAD: try autoplay ---
+    // --- AUTOPLAY ATTEMPT AFTER LOAD ---
     window.addEventListener('load', () => {
       setTimeout(calcMaxScroll, 500);
-      resetSong();
 
       const playPromise = music.play();
       if (playPromise !== undefined) {
@@ -423,14 +463,19 @@
             scheduleEnding();
           })
           .catch(() => {
-            resetSong();
-            playBtn.classList.remove('hidden');
-            poem.classList.add('paused');
+            // Autoplay blocked — nothing to do, hardReset already set things up
+            resetForManualStart();
           });
       }
     });
 
-    // Extra fallback: first tap anywhere also starts everything
+    function resetForManualStart() {
+      music.pause();
+      try { music.currentTime = 0; } catch (e) {}
+      poem.classList.add('paused');
+      playBtn.classList.remove('hidden');
+    }
+
     document.body.addEventListener('click', () => {
       if (!started && !finished) {
         startEverything();
