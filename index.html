@@ -19,6 +19,15 @@
     overflow-x: hidden;
   }
 
+  /* Poem starts paused — animations only run when .started is added */
+  .poem { padding-top: 60px; }
+
+  .poem.paused .fade-line,
+  .poem.paused .signature {
+    animation-play-state: paused;
+    opacity: 0;
+  }
+
   .scroll-wrap {
     min-height: 100vh;
     display: flex;
@@ -36,7 +45,6 @@
     letter-spacing: 0.4px;
     text-shadow: 0 0 20px rgba(240, 230, 210, 0.15);
     animation: breathe 16s ease-in-out infinite alternate;
-    padding-top: 60px;
   }
 
   .poem h1 {
@@ -175,15 +183,16 @@
 <body>
 
   <!-- 🎵 Replace with your song file or URL -->
-  <audio id="bg-music" loop>
+  <audio id="bg-music" loop preload="auto">
     <source src="Ariana Grande - we can't be friends (wait for your love) (official music video).mp3" type="audio/mpeg">
   </audio>
 
-  <!-- Fallback button — hidden if autoplay works, shown only if blocked -->
-  <button id="play-btn" class="hidden" onclick="startMusic()">▶ tap to begin</button>
+  <!-- The button is now visible by default — it's the "start" trigger -->
+  <button id="play-btn" onclick="startEverything()">▶ begin</button>
 
   <div class="scroll-wrap" id="scrollWrap">
-    <div class="poem">
+    <!-- .paused keeps the poem frozen until the button is tapped -->
+    <div class="poem paused" id="poem">
       <h1>The Echo of Those Nights</h1>
 
       <p class="fade-line">
@@ -197,7 +206,7 @@
       </p>
 
       <p class="fade-line">
-        The night was warm, the words were kind,<br>
+        The night was cold, the words were kind,<br>
         And nothing harsh was left behind.
       </p>
 
@@ -263,6 +272,7 @@
     const music = document.getElementById('bg-music');
     const playBtn = document.getElementById('play-btn');
     const scrollWrap = document.getElementById('scrollWrap');
+    const poem = document.getElementById('poem');
     const endingMessage = document.getElementById('endingMessage');
 
     // ⏱️ EDIT: seconds to skip at the start of the song
@@ -282,12 +292,13 @@
     let scrolled = 0;
     let maxScroll = 0;
     let finished = false;
+    let started = false;
 
-    // --- MUSIC ---
+    // --- MUSIC + POEM START TOGETHER ---
     function playFromSkipPoint() {
-      if (music.readyState >= 1) {
+      try {
         music.currentTime = SKIP_SECONDS;
-      } else {
+      } catch (e) {
         music.addEventListener('loadedmetadata', () => {
           music.currentTime = SKIP_SECONDS;
         }, { once: true });
@@ -297,13 +308,35 @@
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            playBtn.classList.add('hidden');
-            startAutoScroll();
+            if (Math.abs(music.currentTime - SKIP_SECONDS) > 0.5) {
+              music.currentTime = SKIP_SECONDS;
+            }
           })
           .catch(() => {
+            // Autoplay blocked — show the button so she can tap
             playBtn.classList.remove('hidden');
+            started = false;
+            poem.classList.add('paused');
           });
       }
+    }
+
+    // Starts EVERYTHING: music, poem animation, scroll
+    function startEverything() {
+      if (started) return;
+      started = true;
+
+      // Hide the button
+      playBtn.classList.add('hidden');
+
+      // 1. Start the music from the skip point
+      playFromSkipPoint();
+
+      // 2. Unpause the poem's fade-in animations
+      poem.classList.remove('paused');
+
+      // 3. Start the auto-scroll
+      startAutoScroll();
     }
 
     // --- AUTO SCROLL ---
@@ -347,22 +380,20 @@
 
     // --- ENDING SEQUENCE ---
     function fadeOutEnding() {
-      // 1. Fade the poem away
       scrollWrap.style.opacity = '0';
 
-      // 2. Bring the song back to full volume and make sure it's playing
       music.volume = 1;
       if (music.paused) {
-        music.currentTime = SKIP_SECONDS;
+        try {
+          music.currentTime = SKIP_SECONDS;
+        } catch (e) {}
         music.play();
       }
 
-      // 3. After the poem fades, show the ending message
       setTimeout(() => {
         endingMessage.classList.add('show');
       }, 2500);
 
-      // 4. Let the song play for a while, then fade it out gently
       setTimeout(() => {
         const startVol = music.volume;
         const fadeStart = performance.now();
@@ -379,29 +410,59 @@
           }
         }
         requestAnimationFrame(fadeMusic);
-      }, 2500 + 22000); // message appears at 2.5s, song plays 22s after that
+      }, 2500 + 22000);
     }
 
-    // --- INITIAL START ---
+    // --- INITIAL LOAD ---
     window.addEventListener('load', () => {
       setTimeout(calcMaxScroll, 500);
-      playFromSkipPoint();
+
+      // Try autoplay — but the poem STAYS paused until autoplay succeeds
+      try {
+        music.currentTime = SKIP_SECONDS;
+      } catch (e) {
+        music.addEventListener('loadedmetadata', () => {
+          music.currentTime = SKIP_SECONDS;
+        }, { once: true });
+      }
+
+      const playPromise = music.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            // Autoplay worked — hide button AND start poem in sync
+            if (Math.abs(music.currentTime - SKIP_SECONDS) > 0.5) {
+              music.currentTime = SKIP_SECONDS;
+            }
+            started = true;
+            playBtn.classList.add('hidden');
+            poem.classList.remove('paused');
+            startAutoScroll();
+          })
+          .catch(() => {
+            // Autoplay blocked — show button, keep poem paused
+            playBtn.classList.remove('hidden');
+            poem.classList.add('paused');
+          });
+      }
     });
 
-    // Manual fallback if autoplay was blocked
+    // Manual trigger (button)
     function startMusic() {
-      playFromSkipPoint();
+      startEverything();
     }
 
-    // Extra fallback: first tap anywhere also starts music
+    // Extra fallback: first tap/click anywhere starts everything
     document.body.addEventListener('click', () => {
-      if (music.paused && !finished) {
-        playFromSkipPoint();
+      if (!started) {
+        startEverything();
       }
     }, { once: true });
 
     music.addEventListener('pause', () => {
-      if (!finished) playBtn.classList.remove('hidden');
+      if (!finished && !started) {
+        playBtn.classList.remove('hidden');
+      }
     });
   </script>
 
