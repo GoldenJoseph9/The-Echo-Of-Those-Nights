@@ -19,7 +19,6 @@
     overflow-x: hidden;
   }
 
-  /* Poem starts paused — animations only run when .started is added */
   .poem { padding-top: 60px; }
 
   .poem.paused .fade-line,
@@ -92,7 +91,6 @@
     to   { filter: brightness(1.08); }
   }
 
-  /* ✍️ EDIT THIS: your signature line at the end */
   .signature {
     margin-top: 60px;
     font-style: italic;
@@ -104,7 +102,6 @@
     animation-delay: 60s;
   }
 
-  /* 💌 ENDING MESSAGE */
   .ending-message {
     position: fixed;
     inset: 0;
@@ -187,11 +184,9 @@
     <source src="Ariana Grande - we can't be friends (wait for your love) (official music video).mp3" type="audio/mpeg">
   </audio>
 
-  <!-- The button is now visible by default — it's the "start" trigger -->
   <button id="play-btn" onclick="startEverything()">▶ begin</button>
 
   <div class="scroll-wrap" id="scrollWrap">
-    <!-- .paused keeps the poem frozen until the button is tapped -->
     <div class="poem paused" id="poem">
       <h1>The Echo of Those Nights</h1>
 
@@ -250,12 +245,10 @@
         To someone who'll choose to stay.
       </p>
 
-      <!-- ✍️ EDIT YOUR NAME HERE -->
       <p class="signature">— with warmth, Gabriel</p>
     </div>
   </div>
 
-  <!-- 💌 ENDING MESSAGE -->
   <div class="ending-message" id="endingMessage">
     <div class="song">
       My favorite song lately. Hurts though.
@@ -294,30 +287,38 @@
     let finished = false;
     let started = false;
 
-    // --- MUSIC + POEM START TOGETHER ---
-    function playFromSkipPoint() {
-      try {
-        music.currentTime = SKIP_SECONDS;
-      } catch (e) {
-        music.addEventListener('loadedmetadata', () => {
+    // --- SAFARI-SAFE MUSIC START ---
+    // Safari ignores currentTime before metadata loads, and can reset it
+    // on the first play() call. This waits for metadata, seeks, then plays,
+    // and re-checks after play starts.
+    function playFromSkipPoint(onSuccess, onFail) {
+      function seekThenPlay() {
+        if (music.currentTime < SKIP_SECONDS - 0.5) {
           music.currentTime = SKIP_SECONDS;
-        }, { once: true });
+        }
+
+        setTimeout(() => {
+          const playPromise = music.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                // Safari sometimes resets to 0 on first play — fix it
+                if (music.currentTime < SKIP_SECONDS - 1) {
+                  music.currentTime = SKIP_SECONDS;
+                }
+                if (onSuccess) onSuccess();
+              })
+              .catch(() => {
+                if (onFail) onFail();
+              });
+          }
+        }, 150);
       }
 
-      const playPromise = music.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            if (Math.abs(music.currentTime - SKIP_SECONDS) > 0.5) {
-              music.currentTime = SKIP_SECONDS;
-            }
-          })
-          .catch(() => {
-            // Autoplay blocked — show the button so she can tap
-            playBtn.classList.remove('hidden');
-            started = false;
-            poem.classList.add('paused');
-          });
+      if (music.readyState >= 1) {
+        seekThenPlay();
+      } else {
+        music.addEventListener('loadedmetadata', seekThenPlay, { once: true });
       }
     }
 
@@ -326,17 +327,16 @@
       if (started) return;
       started = true;
 
-      // Hide the button
       playBtn.classList.add('hidden');
-
-      // 1. Start the music from the skip point
-      playFromSkipPoint();
-
-      // 2. Unpause the poem's fade-in animations
       poem.classList.remove('paused');
-
-      // 3. Start the auto-scroll
       startAutoScroll();
+
+      playFromSkipPoint(null, () => {
+        // If it failed on tap (rare), show button again
+        playBtn.classList.remove('hidden');
+        started = false;
+        poem.classList.add('paused');
+      });
     }
 
     // --- AUTO SCROLL ---
@@ -417,34 +417,21 @@
     window.addEventListener('load', () => {
       setTimeout(calcMaxScroll, 500);
 
-      // Try autoplay — but the poem STAYS paused until autoplay succeeds
-      try {
-        music.currentTime = SKIP_SECONDS;
-      } catch (e) {
-        music.addEventListener('loadedmetadata', () => {
-          music.currentTime = SKIP_SECONDS;
-        }, { once: true });
-      }
-
-      const playPromise = music.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            // Autoplay worked — hide button AND start poem in sync
-            if (Math.abs(music.currentTime - SKIP_SECONDS) > 0.5) {
-              music.currentTime = SKIP_SECONDS;
-            }
-            started = true;
-            playBtn.classList.add('hidden');
-            poem.classList.remove('paused');
-            startAutoScroll();
-          })
-          .catch(() => {
-            // Autoplay blocked — show button, keep poem paused
-            playBtn.classList.remove('hidden');
-            poem.classList.add('paused');
-          });
-      }
+      // Try autoplay with the same Safari-safe routine
+      playFromSkipPoint(
+        () => {
+          // Autoplay worked — start poem and scroll in sync
+          started = true;
+          playBtn.classList.add('hidden');
+          poem.classList.remove('paused');
+          startAutoScroll();
+        },
+        () => {
+          // Autoplay blocked — keep poem paused, show button
+          playBtn.classList.remove('hidden');
+          poem.classList.add('paused');
+        }
+      );
     });
 
     // Manual trigger (button)
