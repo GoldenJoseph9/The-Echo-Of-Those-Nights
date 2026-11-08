@@ -7,9 +7,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  html, body {
-    height: 100%;
-  }
+  html, body { height: 100%; }
 
   body {
     background: linear-gradient(160deg, #0f0c29, #302b63, #24243e);
@@ -60,6 +58,7 @@
     animation: fadeIn 4.5s ease forwards;
   }
 
+  /* h1 is child 1, so first <p> is child 2 ... signature is child 12 */
   .fade-line:nth-child(2)  { animation-delay: 2s; }
   .fade-line:nth-child(3)  { animation-delay: 7.5s; }
   .fade-line:nth-child(4)  { animation-delay: 13s; }
@@ -70,18 +69,11 @@
   .fade-line:nth-child(9)  { animation-delay: 40.5s; }
   .fade-line:nth-child(10) { animation-delay: 46s; }
   .fade-line:nth-child(11) { animation-delay: 51.5s; }
+  .fade-line:nth-child(12) { animation-delay: 57s; }   /* last poem line */
 
   @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(16px);
-      filter: blur(4px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-      filter: blur(0);
-    }
+    from { opacity: 0; transform: translateY(16px); filter: blur(4px); }
+    to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
   }
 
   @keyframes breathe {
@@ -89,6 +81,7 @@
     to   { filter: brightness(1.08); }
   }
 
+  /* signature is child 13 — give it its OWN late delay */
   .signature {
     margin-top: 60px;
     font-style: italic;
@@ -97,7 +90,7 @@
     color: #c9b896;
     opacity: 0;
     animation: fadeIn 5s ease forwards;
-    animation-delay: 62s;
+    animation-delay: 64s;
   }
 
   .ending-message {
@@ -116,10 +109,7 @@
     z-index: 20;
   }
 
-  .ending-message.show {
-    opacity: 1;
-    pointer-events: auto;
-  }
+  .ending-message.show { opacity: 1; pointer-events: auto; }
 
   .ending-message .song {
     font-size: 1.2rem;
@@ -187,60 +177,17 @@
     <div class="poem paused" id="poem">
       <h1>The Echo of Those Nights</h1>
 
-      <p class="fade-line">
-        We talked for hours, until the night grew old,<br>
-        And in your voice I heard a gentle "no."
-      </p>
-
-      <p class="fade-line">
-        You said you're not in a season for this,<br>
-        And I understand—I wanted you to know.
-      </p>
-
-      <p class="fade-line">
-        The night was cold, the words were kind,<br>
-        And nothing harsh was left behind.
-      </p>
-
-      <p class="fade-line">
-        But some things can't be held too tight,<br>
-        So I'll let the echo fade into the night.
-      </p>
-
-      <p class="fade-line">
-        I wanted you—I won't pretend,<br>
-        But I can't force a heart, or make a season bend.
-      </p>
-
-      <p class="fade-line">
-        I watched you speak, I heard you clear,<br>
-        And still I wished the words were different here.
-      </p>
-
-      <p class="fade-line">
-        I memorized the way you laughed,<br>
-        A sound I'd keep if I could keep just half.
-      </p>
-
-      <p class="fade-line">
-        But I can't be the friend who stands aside,<br>
-        With all this feeling I have to hide.
-      </p>
-
-      <p class="fade-line">
-        So here's my hand, and here's my grace,<br>
-        I'll hold the good, and leave the rest in place.
-      </p>
-
-      <p class="fade-line">
-        May your season come, may your heart find spring,<br>
-        And may you find the risk is worth the everything.
-      </p>
-
-      <p class="fade-line">
-        And as for me—I'll find my way,<br>
-        To someone who'll choose to stay.
-      </p>
+      <p class="fade-line">We talked for hours, until the night grew old,<br>And in your voice I heard a gentle "no."</p>
+      <p class="fade-line">You said you're not in a season for this,<br>And I understand—I wanted you to know.</p>
+      <p class="fade-line">The night was cold, the words were kind,<br>And nothing harsh was left behind.</p>
+      <p class="fade-line">But some things can't be held too tight,<br>So I'll let the echo fade into the night.</p>
+      <p class="fade-line">I wanted you—I won't pretend,<br>But I can't force a heart, or make a season bend.</p>
+      <p class="fade-line">I watched you speak, I heard you clear,<br>And still I wished the words were different here.</p>
+      <p class="fade-line">I memorized the way you laughed,<br>A sound I'd keep if I could keep just half.</p>
+      <p class="fade-line">But I can't be the friend who stands aside,<br>With all this feeling I have to hide.</p>
+      <p class="fade-line">So here's my hand, and here's my grace,<br>I'll hold the good, and leave the rest in place.</p>
+      <p class="fade-line">May your season come, may your heart find spring,<br>And may you find the risk is worth the everything.</p>
+      <p class="fade-line">And as for me—I'll find my way,<br>To someone who'll choose to stay.</p>
 
       <p class="signature">— with warmth, Gabriel</p>
     </div>
@@ -265,14 +212,9 @@
     const poem = document.getElementById('poem');
     const endingMessage = document.getElementById('endingMessage');
 
-    // ⏱️ Auto-scroll speed — pixels per second (lower = slower)
-    const SCROLL_SPEED = 22;
-
-    // ⏱️ How long to hold at the very end before fading out (ms)
-    const END_HOLD_MS = 8000;
-
-    // ⏱️ Length of the final fade-out (ms)
-    const END_FADE_MS = 5000;
+    const SCROLL_SPEED = 22;      // px per second
+    const END_HOLD_MS  = 8000;
+    const END_FADE_MS  = 5000;
 
     let autoScrollRAF = null;
     let lastTimestamp = null;
@@ -282,37 +224,27 @@
     let started = false;
     let endingTimer = null;
 
-    // --- Reset song position (does not play) ---
-    function resetSong() {
-      if (started) return;
-      music.pause();
-      try { music.currentTime = 0; } catch (e) {}
-    }
-    resetSong();
+    // Put audio at zero without ever fighting the user's click.
+    music.pause();
+    try { music.currentTime = 0; } catch (e) {}
 
-    // --- Auto scroll ---
     function calcMaxScroll() {
-      maxScroll = Math.max(
-        0,
-        document.documentElement.scrollHeight - window.innerHeight
-      );
+      maxScroll = Math.max(0,
+        document.documentElement.scrollHeight - window.innerHeight);
     }
 
     function autoScrollStep(timestamp) {
       if (finished) return;
-
       if (lastTimestamp === null) lastTimestamp = timestamp;
       const delta = (timestamp - lastTimestamp) / 1000;
       lastTimestamp = timestamp;
 
       scrolled += SCROLL_SPEED * delta;
-
       if (scrolled >= maxScroll) {
         scrolled = maxScroll;
         window.scrollTo(0, scrolled);
         return;
       }
-
       window.scrollTo(0, scrolled);
       autoScrollRAF = requestAnimationFrame(autoScrollStep);
     }
@@ -327,14 +259,11 @@
 
     window.addEventListener('resize', calcMaxScroll);
 
-    // --- Schedule ending based on poem completion + scroll ---
     function scheduleEnding() {
       if (endingTimer) return;
-
-      const POEM_DONE_MS = 70000;
+      const POEM_DONE_MS = 72000; // signature (64s + 5s fade) + a little slack
       const SCROLL_DONE_MS = (maxScroll / SCROLL_SPEED) * 1000;
       const waitMs = Math.max(POEM_DONE_MS, SCROLL_DONE_MS) + END_HOLD_MS;
-
       endingTimer = setTimeout(() => {
         if (finished) return;
         finished = true;
@@ -342,7 +271,7 @@
       }, waitMs);
     }
 
-    // --- Start everything (triggered ONLY by button) ---
+    // Single entry point — button only.
     function startEverything() {
       if (started || finished) return;
       started = true;
@@ -350,81 +279,58 @@
       playBtn.classList.add('hidden');
       poem.classList.remove('paused');
 
-      // iOS Safari: declare this as media playback so it isn't suspended
+      // Visuals start NOW, independent of audio success:
+      calcMaxScroll();
+      startAutoScroll();
+      scheduleEnding();
+
+      // Audio starts in parallel — do NOT gate the visuals on it.
       if (navigator.audioSession) {
         try { navigator.audioSession.type = 'playback'; } catch (e) {}
       }
-
       try { music.currentTime = 0; } catch (e) {}
       music.volume = 1;
-
-      const playPromise = music.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            calcMaxScroll();
-            startAutoScroll();
-            scheduleEnding();
-          })
-          .catch(() => {
-            playBtn.classList.remove('hidden');
-            poem.classList.add('paused');
-            started = false;
-            resetSong();
-          });
-      } else {
-        calcMaxScroll();
-        startAutoScroll();
-        scheduleEnding();
+      const p = music.play();
+      if (p && p.catch) {
+        p.catch(() => {
+          // Autoplay / decode refused — the poem still runs. Show button again
+          // in case the user wants to retry the audio.
+          if (!finished) playBtn.classList.remove('hidden');
+        });
       }
     }
 
-    // --- Ending sequence ---
     function fadeOutEnding() {
       scrollWrap.style.opacity = '0';
 
-      music.volume = 1;
       if (music.paused) {
+        music.volume = 1;
         try { music.currentTime = 0; } catch (e) {}
-        music.play();
+        const p = music.play();
+        if (p && p.catch) p.catch(() => {});
+      } else {
+        music.volume = 1;
       }
 
-      setTimeout(() => {
-        endingMessage.classList.add('show');
-      }, 2500);
+      setTimeout(() => endingMessage.classList.add('show'), 2500);
 
       setTimeout(() => {
         const startVol = music.volume;
         const fadeStart = performance.now();
-
         function fadeMusic(now) {
-          const elapsed = now - fadeStart;
-          const progress = Math.min(elapsed / END_FADE_MS, 1);
+          const progress = Math.min((now - fadeStart) / END_FADE_MS, 1);
           music.volume = startVol * (1 - progress);
-
-          if (progress < 1) {
-            requestAnimationFrame(fadeMusic);
-          } else {
-            music.pause();
-          }
+          if (progress < 1) requestAnimationFrame(fadeMusic);
+          else music.pause();
         }
         requestAnimationFrame(fadeMusic);
       }, 2500 + 22000);
     }
 
-    // --- NO AUTOPLAY ON LOAD ---
     window.addEventListener('load', () => {
       setTimeout(calcMaxScroll, 500);
-      resetSong();
       playBtn.classList.remove('hidden');
       poem.classList.add('paused');
-    });
-
-    // Keep button visible if music pauses before start
-    music.addEventListener('pause', () => {
-      if (!finished && !started) {
-        playBtn.classList.remove('hidden');
-      }
     });
   </script>
 
