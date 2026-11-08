@@ -38,7 +38,6 @@
     animation: breathe 16s ease-in-out infinite alternate;
   }
 
-  /* Only the fade-line and signature hide when paused */
   .poem.paused .fade-line,
   .poem.paused .signature {
     animation-play-state: paused;
@@ -61,7 +60,6 @@
     animation: fadeIn 4.5s ease forwards;
   }
 
-  /* Delays for each line — last line (signature) is now far later */
   .fade-line:nth-child(2)  { animation-delay: 2s; }
   .fade-line:nth-child(3)  { animation-delay: 7.5s; }
   .fade-line:nth-child(4)  { animation-delay: 13s; }
@@ -91,7 +89,6 @@
     to   { filter: brightness(1.08); }
   }
 
-  /* Signature appears much later — after ALL lines, not earlier */
   .signature {
     margin-top: 60px;
     font-style: italic;
@@ -100,7 +97,7 @@
     color: #c9b896;
     opacity: 0;
     animation: fadeIn 5s ease forwards;
-    animation-delay: 62s; /* was 60s — pushed a bit to avoid early flash */
+    animation-delay: 62s;
   }
 
   .ending-message {
@@ -180,8 +177,8 @@
 </head>
 <body>
 
-  <audio id="bg-music" loop preload="auto">
-    <source src="Ariana Grande - we can't be friends (wait for your love) (official music video).mp3" type="audio/mpeg">
+  <audio id="bg-music" loop preload="auto" playsinline>
+    <source src="song.mp3" type="audio/mpeg">
   </audio>
 
   <button id="play-btn" onclick="startEverything()">▶ begin</button>
@@ -277,7 +274,6 @@
     // ⏱️ Length of the final fade-out (ms)
     const END_FADE_MS = 5000;
 
-    // --- NO AUTOPLAY: we only start via button ---
     let autoScrollRAF = null;
     let lastTimestamp = null;
     let scrolled = 0;
@@ -288,6 +284,7 @@
 
     // --- Reset song position (does not play) ---
     function resetSong() {
+      if (started) return;
       music.pause();
       try { music.currentTime = 0; } catch (e) {}
     }
@@ -334,9 +331,7 @@
     function scheduleEnding() {
       if (endingTimer) return;
 
-      // Wait for the poem to finish unfolding (signature visible ~62s + 5s animation)
-      // and for the scroll to reach the bottom, then hold, then end.
-      const POEM_DONE_MS = 70000; // safely past signature (62s + 5s fade)
+      const POEM_DONE_MS = 70000;
       const SCROLL_DONE_MS = (maxScroll / SCROLL_SPEED) * 1000;
       const waitMs = Math.max(POEM_DONE_MS, SCROLL_DONE_MS) + END_HOLD_MS;
 
@@ -347,7 +342,7 @@
       }, waitMs);
     }
 
-    // --- Start everything (triggered ONLY by button or tap) ---
+    // --- Start everything (triggered ONLY by button) ---
     function startEverything() {
       if (started || finished) return;
       started = true;
@@ -355,7 +350,11 @@
       playBtn.classList.add('hidden');
       poem.classList.remove('paused');
 
-      // Reset music to start and play
+      // iOS Safari: declare this as media playback so it isn't suspended
+      if (navigator.audioSession) {
+        try { navigator.audioSession.type = 'playback'; } catch (e) {}
+      }
+
       try { music.currentTime = 0; } catch (e) {}
       music.volume = 1;
 
@@ -368,7 +367,6 @@
             scheduleEnding();
           })
           .catch(() => {
-            // Autoplay blocked (unlikely after click) — restore button
             playBtn.classList.remove('hidden');
             poem.classList.add('paused');
             started = false;
@@ -415,23 +413,14 @@
     }
 
     // --- NO AUTOPLAY ON LOAD ---
-    // We only prepare the layout, do not play or start anything.
     window.addEventListener('load', () => {
       setTimeout(calcMaxScroll, 500);
       resetSong();
-      // Ensure button visible and poem paused
       playBtn.classList.remove('hidden');
       poem.classList.add('paused');
     });
 
-    // First tap anywhere also starts (if not started yet)
-    document.body.addEventListener('click', () => {
-      if (!started && !finished) {
-        startEverything();
-      }
-    }, { once: true });
-
-    // If the user manually pauses music before start, keep button visible
+    // Keep button visible if music pauses before start
     music.addEventListener('pause', () => {
       if (!finished && !started) {
         playBtn.classList.remove('hidden');
