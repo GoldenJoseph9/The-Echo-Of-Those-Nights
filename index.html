@@ -19,22 +19,14 @@
     overflow-x: hidden;
   }
 
-  /* Poem starts paused — animations only run when .started is added */
-  .poem { padding-top: 60px; }
-
-  .poem.paused .fade-line,
-  .poem.paused .signature {
-    animation-play-state: paused;
-    opacity: 0;
-  }
-
+  /* Poem is centered vertically and starts paused */
   .scroll-wrap {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    padding: 40px 20px 120px;
+    justify-content: center;   /* ← centers it on screen */
+    padding: 40px 20px;
     transition: opacity 4s ease;
   }
 
@@ -45,6 +37,13 @@
     letter-spacing: 0.4px;
     text-shadow: 0 0 20px rgba(240, 230, 210, 0.15);
     animation: breathe 16s ease-in-out infinite alternate;
+    padding-top: 0;
+  }
+
+  .poem.paused .fade-line,
+  .poem.paused .signature {
+    animation-play-state: paused;
+    opacity: 0;
   }
 
   .poem h1 {
@@ -92,7 +91,6 @@
     to   { filter: brightness(1.08); }
   }
 
-  /* ✍️ EDIT THIS: your signature line at the end */
   .signature {
     margin-top: 60px;
     font-style: italic;
@@ -104,7 +102,6 @@
     animation-delay: 60s;
   }
 
-  /* 💌 ENDING MESSAGE */
   .ending-message {
     position: fixed;
     inset: 0;
@@ -182,16 +179,14 @@
 </head>
 <body>
 
-  <!-- 🎵 Replace with your song file or URL -->
+  <!-- 🎵 Song file — trimmed version, starts at 0 -->
   <audio id="bg-music" loop preload="auto">
     <source src="Ariana Grande - we can't be friends (wait for your love) (official music video).mp3" type="audio/mpeg">
   </audio>
 
-  <!-- The button is now visible by default — it's the "start" trigger -->
   <button id="play-btn" onclick="startEverything()">▶ begin</button>
 
   <div class="scroll-wrap" id="scrollWrap">
-    <!-- .paused keeps the poem frozen until the button is tapped -->
     <div class="poem paused" id="poem">
       <h1>The Echo of Those Nights</h1>
 
@@ -206,7 +201,7 @@
       </p>
 
       <p class="fade-line">
-        The night was warm, the words were kind,<br>
+        The night was cold, the words were kind,<br>
         And nothing harsh was left behind.
       </p>
 
@@ -250,12 +245,10 @@
         To someone who'll choose to stay.
       </p>
 
-      <!-- ✍️ EDIT YOUR NAME HERE -->
       <p class="signature">— with warmth, Gabriel</p>
     </div>
   </div>
 
-  <!-- 💌 ENDING MESSAGE -->
   <div class="ending-message" id="endingMessage">
     <div class="song">
       My favorite song lately. Hurts though.
@@ -275,108 +268,44 @@
     const poem = document.getElementById('poem');
     const endingMessage = document.getElementById('endingMessage');
 
-    // ⏱️ EDIT: seconds to skip at the start of the song
-    const SKIP_SECONDS = 50;
-
-    // ⏱️ Auto-scroll speed — pixels per second (lower = slower)
-    const SCROLL_SPEED = 22;
-
-    // ⏱️ Hold at the very end before the ending sequence (ms)
+    // ⏱️ EDIT: how long to hold at the very end before fading out (ms)
     const END_HOLD_MS = 8000;
 
     // ⏱️ Length of the final fade-out (ms)
     const END_FADE_MS = 5000;
 
-    let autoScrollRAF = null;
-    let lastTimestamp = null;
-    let scrolled = 0;
-    let maxScroll = 0;
     let finished = false;
     let started = false;
 
-    // --- MUSIC + POEM START TOGETHER ---
-    function playFromSkipPoint() {
-      try {
-        music.currentTime = SKIP_SECONDS;
-      } catch (e) {
-        music.addEventListener('loadedmetadata', () => {
-          music.currentTime = SKIP_SECONDS;
-        }, { once: true });
-      }
+    // --- ALWAYS START FROM ZERO ---
+    // This prevents the "resume where it stopped" behaviour on reload.
+    function resetSong() {
+      music.pause();
+      try { music.currentTime = 0; } catch (e) {}
+    }
+    resetSong();
+
+    // --- START EVERYTHING TOGETHER ---
+    function startEverything() {
+      if (started || finished) return;
+      started = true;
+
+      playBtn.classList.add('hidden');
+      poem.classList.remove('paused');
+
+      // Force the song back to 0 before playing (handles reloads)
+      try { music.currentTime = 0; } catch (e) {}
 
       const playPromise = music.play();
       if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            if (Math.abs(music.currentTime - SKIP_SECONDS) > 0.5) {
-              music.currentTime = SKIP_SECONDS;
-            }
-          })
-          .catch(() => {
-            // Autoplay blocked — show the button so she can tap
-            playBtn.classList.remove('hidden');
-            started = false;
-            poem.classList.add('paused');
-          });
+        playPromise.catch(() => {
+          // If playback fails, reset the state so she can tap again
+          playBtn.classList.remove('hidden');
+          poem.classList.add('paused');
+          started = false;
+        });
       }
     }
-
-    // Starts EVERYTHING: music, poem animation, scroll
-    function startEverything() {
-      if (started) return;
-      started = true;
-
-      // Hide the button
-      playBtn.classList.add('hidden');
-
-      // 1. Start the music from the skip point
-      playFromSkipPoint();
-
-      // 2. Unpause the poem's fade-in animations
-      poem.classList.remove('paused');
-
-      // 3. Start the auto-scroll
-      startAutoScroll();
-    }
-
-    // --- AUTO SCROLL ---
-    function calcMaxScroll() {
-      maxScroll = Math.max(
-        0,
-        document.documentElement.scrollHeight - window.innerHeight
-      );
-    }
-
-    function autoScrollStep(timestamp) {
-      if (finished) return;
-
-      if (lastTimestamp === null) lastTimestamp = timestamp;
-      const delta = (timestamp - lastTimestamp) / 1000;
-      lastTimestamp = timestamp;
-
-      scrolled += SCROLL_SPEED * delta;
-
-      if (scrolled >= maxScroll) {
-        scrolled = maxScroll;
-        window.scrollTo(0, scrolled);
-        finished = true;
-        setTimeout(fadeOutEnding, END_HOLD_MS);
-        return;
-      }
-
-      window.scrollTo(0, scrolled);
-      autoScrollRAF = requestAnimationFrame(autoScrollStep);
-    }
-
-    function startAutoScroll() {
-      if (autoScrollRAF || finished) return;
-      calcMaxScroll();
-      scrolled = window.scrollY;
-      lastTimestamp = null;
-      autoScrollRAF = requestAnimationFrame(autoScrollStep);
-    }
-
-    window.addEventListener('resize', calcMaxScroll);
 
     // --- ENDING SEQUENCE ---
     function fadeOutEnding() {
@@ -384,9 +313,7 @@
 
       music.volume = 1;
       if (music.paused) {
-        try {
-          music.currentTime = SKIP_SECONDS;
-        } catch (e) {}
+        try { music.currentTime = 0; } catch (e) {}
         music.play();
       }
 
@@ -413,48 +340,53 @@
       }, 2500 + 22000);
     }
 
+    // --- WHEN SCROLL FINISHES (poem fully shown) ---
+    // We now wait for the signature to appear, then hold, then end.
+    function scheduleEnding() {
+      if (finished) return;
+      finished = true;
+      setTimeout(fadeOutEnding, END_HOLD_MS);
+    }
+
     // --- INITIAL LOAD ---
     window.addEventListener('load', () => {
-      setTimeout(calcMaxScroll, 500);
+      resetSong();
 
-      // Try autoplay — but the poem STAYS paused until autoplay succeeds
-      try {
-        music.currentTime = SKIP_SECONDS;
-      } catch (e) {
-        music.addEventListener('loadedmetadata', () => {
-          music.currentTime = SKIP_SECONDS;
-        }, { once: true });
-      }
+      // Try autoplay — if it works, start poem + music together
+      try { music.currentTime = 0; } catch (e) {}
 
       const playPromise = music.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            // Autoplay worked — hide button AND start poem in sync
-            if (Math.abs(music.currentTime - SKIP_SECONDS) > 0.5) {
-              music.currentTime = SKIP_SECONDS;
-            }
             started = true;
             playBtn.classList.add('hidden');
             poem.classList.remove('paused');
-            startAutoScroll();
           })
           .catch(() => {
-            // Autoplay blocked — show button, keep poem paused
+            // Autoplay blocked — keep poem paused, show button
+            resetSong();
             playBtn.classList.remove('hidden');
             poem.classList.add('paused');
           });
       }
     });
 
-    // Manual trigger (button)
-    function startMusic() {
-      startEverything();
-    }
+    // --- LAST LINE TIMING FIX ---
+    // The signature animation fires at 60s. We wait until 60s + a
+    // short buffer so it's fully visible before ending.
+    const SIGNATURE_DELAY_MS = 60000;
+    const SIGNATURE_FADE_MS = 5000;
 
-    // Extra fallback: first tap/click anywhere starts everything
+    // Trigger the ending sequence after the signature has fully appeared,
+    // regardless of scroll position.
+    setTimeout(() => {
+      if (started) scheduleEnding();
+    }, SIGNATURE_DELAY_MS + SIGNATURE_FADE_MS + 3000);
+
+    // Extra fallback: first tap anywhere starts everything
     document.body.addEventListener('click', () => {
-      if (!started) {
+      if (!started && !finished) {
         startEverything();
       }
     }, { once: true });
